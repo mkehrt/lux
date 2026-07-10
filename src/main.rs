@@ -1,3 +1,4 @@
+use anyhow::Result;
 use crossterm::event::{read, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use crossterm::cursor;
 use crossterm::execute;
@@ -7,7 +8,7 @@ use std::process;
 
 mod data;
 
-fn main() -> io::Result<()> {
+fn main() -> Result<()> {
     let mut previous_terminal_state = set_up_terminal()?;
 
     let mut terminal_info = get_terminal_info()?;
@@ -51,7 +52,7 @@ fn main() -> io::Result<()> {
     Ok(())
 }
 
-fn handle_ctrl_c(previous_terminal_state: &mut PreviousTerminalState) -> io::Result<()> {
+fn handle_ctrl_c(previous_terminal_state: &mut PreviousTerminalState) -> Result<()> {
     // In the future, this should send a SIGINT to self and do
     // cleanup in the handler.  This means an external signal will
     // be also do cleanup.
@@ -59,7 +60,7 @@ fn handle_ctrl_c(previous_terminal_state: &mut PreviousTerminalState) -> io::Res
     process::exit(130);
 }
 
-fn handle_char(c: char) -> io::Result<()> {
+fn handle_char(c: char) -> Result<()> {
     let mut stdout = io::stdout();
     write!(stdout, "{}", c)?;
     stdout.flush()?;
@@ -70,7 +71,7 @@ fn handle_resize(terminal_info: &mut TerminalInfo, cols: u16, rows: u16) {
     terminal_info.size = TerminalSize { cols, rows };
 }
 
-fn handle_unknown_event(event: Event, terminal_info: &TerminalInfo) -> io::Result<()> {
+fn handle_unknown_event(event: Event, terminal_info: &TerminalInfo) -> Result<()> {
     let mut stdout = io::stdout();
 
     execute!(
@@ -98,7 +99,7 @@ struct TerminalInfo {
     size: TerminalSize,
 }
 
-fn get_terminal_info() -> io::Result<TerminalInfo> {
+fn get_terminal_info() -> Result<TerminalInfo> {
     let (cols, rows) = terminal::size()?;
     Ok(TerminalInfo {
         size: TerminalSize { cols, rows },
@@ -109,7 +110,7 @@ struct PreviousTerminalState {
 }
 
 impl PreviousTerminalState {
-    fn restore(&mut self) -> io::Result<()> {
+    fn restore(&mut self) -> Result<()> {
         execute!(io::stdout(), terminal::LeaveAlternateScreen)?;
         if self.raw_mode_was_enabled {
             terminal::enable_raw_mode()?;
@@ -121,7 +122,7 @@ impl PreviousTerminalState {
     }
 }
 
-fn set_up_terminal() -> io::Result<PreviousTerminalState> {
+fn set_up_terminal() -> Result<PreviousTerminalState> {
     let raw_mode_was_enabled = terminal::is_raw_mode_enabled()?;
     terminal::enable_raw_mode()?;
     execute!(io::stdout(), terminal::EnterAlternateScreen)?;
