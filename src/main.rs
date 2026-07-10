@@ -5,10 +5,12 @@ use crossterm::terminal;
 use std::io::{self, Write as _};
 use std::process;
 
+mod data;
+
 fn main() -> io::Result<()> {
     let mut previous_terminal_state = set_up_terminal()?;
 
-    let mut terminal_size = get_terminal_size()?;
+    let mut terminal_info = get_terminal_info()?;
 
     execute!(
         io::stdout(),
@@ -28,11 +30,7 @@ fn main() -> io::Result<()> {
                 kind: KeyEventKind::Press,
                 state: _,
             }) => {
-                // In the future, this should send a SIGINT to self and do
-                // cleanup in the handler.  This means an external signal will
-                // be also do cleanup.
-                previous_terminal_state.restore()?;
-                process::exit(130);
+                handle_ctrl_c(&mut previous_terminal_state)?;
             }
             Event::Key(KeyEvent {
                 code: KeyCode::Char(c),
@@ -40,28 +38,45 @@ fn main() -> io::Result<()> {
                 kind: KeyEventKind::Press,
                 state: _,
             }) => {
-                let mut stdout = io::stdout();
-                write!(stdout, "{}", c)?;
-                stdout.flush()?;
+                handle_char(c)?;
             }
             Event::Resize(cols, rows) => {
-                terminal_size = TerminalSize { cols, rows };
+                handle_resize(&mut terminal_info, cols, rows);
             }
             other_event => {
-                handle_unknown_event(other_event, terminal_size.cols)?;
+                handle_unknown_event(other_event, &terminal_info)?;
             }
         }
     }
     Ok(())
 }
 
-fn handle_unknown_event(event: Event, terminal_columns: u16) -> io::Result<()> {
+fn handle_ctrl_c(previous_terminal_state: &mut PreviousTerminalState) -> io::Result<()> {
+    // In the future, this should send a SIGINT to self and do
+    // cleanup in the handler.  This means an external signal will
+    // be also do cleanup.
+    previous_terminal_state.restore()?;
+    process::exit(130);
+}
+
+fn handle_char(c: char) -> io::Result<()> {
+    let mut stdout = io::stdout();
+    write!(stdout, "{}", c)?;
+    stdout.flush()?;
+    Ok(())
+}
+
+fn handle_resize(terminal_info: &mut TerminalInfo, cols: u16, rows: u16) {
+    terminal_info.size = TerminalSize { cols, rows };
+}
+
+fn handle_unknown_event(event: Event, terminal_info: &TerminalInfo) -> io::Result<()> {
     let mut stdout = io::stdout();
 
     execute!(
         stdout,
         cursor::SavePosition,
-        cursor::MoveTo(0, terminal_columns - 1),
+        cursor::MoveTo(0, terminal_info.size.rows - 1),
         terminal::Clear(terminal::ClearType::CurrentLine),
     )?;
     write!(stdout, "{:?}", event)?;
@@ -78,9 +93,16 @@ struct TerminalSize {
     cols: u16,
 }
 
-fn get_terminal_size() -> io::Result<TerminalSize> {
+#[derive(Debug)]
+struct TerminalInfo {
+    size: TerminalSize,
+}
+
+fn get_terminal_info() -> io::Result<TerminalInfo> {
     let (cols, rows) = terminal::size()?;
-    Ok(TerminalSize { cols, rows })
+    Ok(TerminalInfo {
+        size: TerminalSize { cols, rows },
+    })
 }
 struct PreviousTerminalState {
     raw_mode_was_enabled: bool,
