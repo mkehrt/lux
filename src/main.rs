@@ -12,17 +12,14 @@ fn main() -> Result<()> {
     let mut previous_terminal_state = set_up_terminal()?;
 
     let mut terminal_info = get_terminal_info()?;
+    let mut data = data::Data::default();
 
     execute!(
         io::stdout(),
         terminal::Clear(terminal::ClearType::All))?;
     
     loop {
-        let event = if let Ok(event) = read() {
-            event
-        } else {
-            break;
-        };
+        let event = read()?;
 
         match event {
             Event::Key(KeyEvent {
