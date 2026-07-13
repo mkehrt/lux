@@ -1,5 +1,3 @@
-use anyhow::{bail, Result};
-
 #[derive(Default)]
 pub struct Data {
     pub strings: Vec<String>,
@@ -7,7 +5,7 @@ pub struct Data {
 }
 
 impl Data {
-    pub fn write_to_data(&mut self, text: &str) -> Result<()> {
+    pub fn write(&mut self, text: &str) {
         while self.strings.len() <= self.cursor.row {
             self.strings.push(String::new());
         }
@@ -15,25 +13,23 @@ impl Data {
         let row = &mut self.strings[self.cursor.row];
         let mut chars: Vec<char> = row.chars().collect();
 
-        if self.cursor.column > chars.len() {
-            bail!(
-                "cannot write at column {} in row {}, which only has {} columns",
-                self.cursor.column,
-                self.cursor.row,
-                chars.len()
-            );
-        }
+        assert!(
+            self.cursor.logical_column <= chars.len(),
+            "logical column {} is beyond row {}'s length of {}",
+            self.cursor.logical_column,
+            self.cursor.row,
+            chars.len()
+        );
 
         let inserted_len = text.chars().count();
         for (offset, c) in text.chars().enumerate() {
-            chars.insert(self.cursor.column + offset, c);
+            chars.insert(self.cursor.logical_column + offset, c);
         }
 
         *row = chars.into_iter().collect();
 
-        self.cursor.column += inserted_len;
-
-        Ok(())
+        self.cursor.logical_column += inserted_len;
+        self.clamp_physical_column();
     }
 
     pub fn concatenate(&self) -> String {
@@ -45,7 +41,7 @@ impl Data {
             return;
         }
         self.cursor.row -= 1;
-        self.clamp_cursor_column();
+        self.clamp_physical_column();
     }
 
     pub fn move_cursor_down(&mut self) {
@@ -53,37 +49,38 @@ impl Data {
             return;
         }
         self.cursor.row += 1;
-        self.clamp_cursor_column();
+        self.clamp_physical_column();
     }
 
     pub fn move_cursor_left(&mut self) {
-        if self.cursor.column == 0 {
+        if self.cursor.physical_column == 0 {
             return;
         }
-        self.cursor.column -= 1;
+        self.cursor.physical_column -= 1;
+        self.cursor.logical_column = self.cursor.physical_column;
     }
 
     pub fn move_cursor_right(&mut self) {
-        if self.cursor.column >= self.row_len(self.cursor.row) {
+        if self.cursor.physical_column >= self.row_len(self.cursor.row) {
             return;
         }
-        self.cursor.column += 1;
+        self.cursor.physical_column += 1;
+        self.cursor.logical_column = self.cursor.physical_column;
     }
 
     fn row_len(&self, row: usize) -> usize {
         self.strings.get(row).map_or(0, |s| s.chars().count())
     }
 
-    fn clamp_cursor_column(&mut self) {
+    fn update_physical_column(&mut self) {
         let len = self.row_len(self.cursor.row);
-        if self.cursor.column > len {
-            self.cursor.column = len;
-        }
+        self.cursor.physical_column = self.cursor.logical_column.min(len);
     }
 }
 
 #[derive(Default)]
 pub struct Cursor {
-    pub column: usize,
-    pub row: usize,
+    row: usize,
+    logical_column: usize,
+    physical_column: usize,
 }
