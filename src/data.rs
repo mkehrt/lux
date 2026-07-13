@@ -72,14 +72,22 @@ impl Data {
         self.strings.get(row).map_or(0, |s| s.chars().count())
     }
 
-    fn update_physical_column(&mut self) {
+    fn clamp_physical_column(&mut self) {
         let len = self.row_len(self.cursor.row);
         self.cursor.physical_column = self.cursor.logical_column.min(len);
+    }
+
+    fn get_row(&self, row: usize) -> usize {
+        self.cursor.row
+    }
+
+    fn get_physical_column(&self) -> usize {
+        self.cursor.physical_column
     }
 }
 
 #[derive(Default)]
-pub struct Cursor {
+struct Cursor {
     row: usize,
     logical_column: usize,
     physical_column: usize,
