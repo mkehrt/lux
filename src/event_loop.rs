@@ -31,7 +31,7 @@ pub fn event_loop(mut state: State) -> Result<()> {
                 kind: KeyEventKind::Press,
                 state: _,
             }) => {
-                state.handle_enter();
+                state.handle_enter()?;
             }
             Event::Key(KeyEvent {
                 code: code @ (KeyCode::Up | KeyCode::Down | KeyCode::Left | KeyCode::Right),

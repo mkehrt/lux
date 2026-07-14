@@ -2,10 +2,21 @@ use anyhow::Result;
 
 const NEWLINE: char = '\n';
 
-#[derive(Default)]
 pub struct Data {
     data: Vec<String>,
     cursor: Cursor,
+}
+
+impl Default for Data {
+    fn default() -> Self {
+        let one_empty_row = String::new();
+        let data = vec![one_empty_row];
+        let cursor = Cursor::default();
+        Self {
+            data,
+            cursor,
+        }
+    }
 }
 
 impl Data {
