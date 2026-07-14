@@ -1,6 +1,6 @@
 use anyhow::Result;
 
-const NEWLINE: &str = "\n";
+const NEWLINE: char = '\n';
 
 #[derive(Default)]
 pub struct Data {
@@ -9,17 +9,51 @@ pub struct Data {
 }
 
 impl Data {
-    pub fn write(&mut self, text: &str) -> Result<()> {
-        while self.data.len() <= self.cursor.row {
-            self.data.push(String::new());
-        }
+    fn write(&mut self, text: char) -> Result<()> {
+        assert!(self.data.len() > self.cursor.row, "Row index out of bounds");
 
-        let row = &mut self.data.get_mut(self.cursor.row)
+        let row = &mut self
+            .data
+            .get_mut(self.cursor.row)
+            .expect("Row index out of bounds");
+        row.insert(self.cursor.physical_column, text);
+
+        self.cursor.logical_column += 1;
+        self.clamp_physical_column();
+
+        Ok(())
+    }
+
+    /// Char should not be a newline
+    pub fn insert_char(&mut self, text: char) -> Result<()> {
+        assert!(text != '\n', "Char should not be a newline (\\n)");
+        assert!(text != '\r', "Char should not be a newline (\\r)");
+
+        self.write(text)?;
+        Ok(())
+    }
+
+    pub fn insert_newline(&mut self) -> Result<()> {
+        // Insert a newline at the current cursor position
+        self.write(NEWLINE)?;
+
+        let row = self
+            .data
+            .get_mut(self.cursor.row)
             .ok_or_else(|| anyhow::anyhow!("Failed to get row: {}", self.cursor.row))?;
-        row.push_str(text);
+        let chars: Vec<char> = row.chars().collect();
+        let split_at = self.cursor.logical_column.min(chars.len());
 
-        let inserted_len = text.chars().count();
-        self.cursor.logical_column += inserted_len;
+        // Move the rest of the current row to the new string
+        let remainder: String = chars[split_at..].iter().collect();
+        *row = chars[..split_at].iter().collect();
+
+        // Insert a new string after the current row
+        self.data.insert(self.cursor.row + 1, remainder);
+
+        // Move the cursor to the beginning of the new string
+        self.cursor.row += 1;
+        self.cursor.logical_column = 0;
         self.clamp_physical_column();
 
         Ok(())
@@ -59,32 +93,6 @@ impl Data {
         }
         self.cursor.physical_column += 1;
         self.cursor.logical_column = self.cursor.physical_column;
-    }
-
-    pub fn newline(&mut self) -> Result<()> {
-        // Insert a newline at the current cursor position
-        self.write(NEWLINE)?;
-
-        let row = self
-            .data
-            .get_mut(self.cursor.row)
-            .ok_or_else(|| anyhow::anyhow!("Failed to get row: {}", self.cursor.row))?;
-        let chars: Vec<char> = row.chars().collect();
-        let split_at = self.cursor.logical_column.min(chars.len());
-
-        // Move the rest of the current row to the new string
-        let remainder: String = chars[split_at..].iter().collect();
-        *row = chars[..split_at].iter().collect();
-
-        // Insert a new string after the current row
-        self.data.insert(self.cursor.row + 1, remainder);
-
-        // Move the cursor to the beginning of the new string
-        self.cursor.row += 1;
-        self.cursor.logical_column = 0;
-        self.clamp_physical_column();
-
-        Ok(())
     }
 
     fn row_len(&self, row: usize) -> usize {
