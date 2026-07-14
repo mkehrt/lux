@@ -47,19 +47,27 @@ pub fn write_char(c: char) -> Result<()> {
     Ok(())
 }
 
-pub fn print_debug_line(text: &str, row: u16) -> Result<()> {
-    let mut stdout = io::stdout();
-
+pub fn write_screen(text: &str) -> Result<()> {
     execute!(
-        stdout,
+        io::stdout(),
+        terminal::Clear(terminal::ClearType::All),
         cursor::SavePosition,
-        cursor::MoveTo(0, row),
-        terminal::Clear(terminal::ClearType::CurrentLine),
+        cursor::MoveTo(0, 0),
     )?;
-    write!(stdout, "{}", text)?;
-    stdout.flush()?;
+    let text = text.replace('\n', "\r\n");
+    write!(io::stdout(), "{}", text)?;
+    execute!(io::stdout(), cursor::RestorePosition)?;
+    Ok(())
+}
 
-    execute!(stdout, cursor::RestorePosition)?;
-
+pub fn write_status_line(text: &str, bottom_row: u16) -> Result<()> {
+    execute!(
+        io::stdout(),
+        cursor::SavePosition,
+        cursor::MoveTo(0, bottom_row)
+    )?;
+    write!(io::stdout(), "{}", text)?;
+    io::stdout().flush()?;
+    execute!(io::stdout(), cursor::RestorePosition)?;
     Ok(())
 }

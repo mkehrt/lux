@@ -9,7 +9,8 @@ use state::State;
 
 fn main() -> Result<()> {
     let previous_terminal_state = state::set_up_terminal()?;
-    let terminal_size = state::get_terminal_size()?;
+    let (cols, rows) = terminal::size()?;
+    let terminal_size = state::TerminalSize::new(cols, rows);
     let data = data::Data::default();
     let state = State::new(previous_terminal_state, terminal_size, data);
 

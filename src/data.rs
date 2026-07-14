@@ -12,15 +12,46 @@ impl Default for Data {
         let one_empty_row = String::new();
         let data = vec![one_empty_row];
         let cursor = Cursor::default();
-        Self {
-            data,
-            cursor,
-        }
+        Self { data, cursor }
     }
 }
 
+#[derive(Debug, PartialEq)]
+pub enum Dirty {
+    Dirty,
+    Clean,
+}
+
 impl Data {
-    fn write(&mut self, text: char) -> Result<()> {
+    pub fn render(&self, start_row: usize, rows: usize, cols: usize) -> Result<String> {
+        self.check_invariants();
+
+        let mut result = String::new();
+        let end_row = start_row + rows;
+        let mut data_row = start_row;
+        let mut rendered_row = start_row;
+        while data_row < self.data.len() && rendered_row < end_row {
+            let row_data = &self.data[data_row];
+            let mut chunk_start = 0;
+            let mut row_done = false;
+            while !row_done && rendered_row < end_row {
+                let chunk_end = (chunk_start + cols).min(row_data.len());
+                result.push_str(&row_data[chunk_start..chunk_end]);
+                rendered_row += 1;
+                row_done = chunk_end >= row_data.len();
+
+                if !row_done {
+                    result.push('\n');
+                }
+
+                chunk_start = chunk_end;
+            }
+            data_row += 1;
+        }
+        Ok(result)
+    }
+
+    fn write(&mut self, text: char) -> Result<Dirty> {
         assert!(self.data.len() > self.cursor.row, "Row index out of bounds");
 
         let row = &mut self
@@ -32,19 +63,29 @@ impl Data {
         self.cursor.logical_column += 1;
         self.clamp_physical_column();
 
-        Ok(())
+        let dirty;
+        if self.cursor.physical_column < self.row_len(self.cursor.row) {
+            dirty = Dirty::Dirty
+        } else {
+            dirty = Dirty::Clean;
+        }
+
+        self.check_invariants();
+        Ok(dirty)
     }
 
     /// Char should not be a newline
-    pub fn insert_char(&mut self, text: char) -> Result<()> {
+    pub fn insert_char(&mut self, text: char) -> Result<Dirty> {
         assert!(text != '\n', "Char should not be a newline (\\n)");
         assert!(text != '\r', "Char should not be a newline (\\r)");
 
-        self.write(text)?;
-        Ok(())
+        let dirty = self.write(text)?;
+
+        self.check_invariants();
+        Ok(dirty)
     }
 
-    pub fn insert_newline(&mut self) -> Result<()> {
+    pub fn insert_newline(&mut self) -> Result<Dirty> {
         // Insert a newline at the current cursor position
         self.write(NEWLINE)?;
 
@@ -67,7 +108,8 @@ impl Data {
         self.cursor.logical_column = 0;
         self.clamp_physical_column();
 
-        Ok(())
+        self.check_invariants();
+        Ok(Dirty::Dirty)
     }
 
     pub fn concatenate(&self) -> String {
@@ -80,6 +122,8 @@ impl Data {
         }
         self.cursor.row -= 1;
         self.clamp_physical_column();
+
+        self.check_invariants();
     }
 
     pub fn move_cursor_down(&mut self) {
@@ -88,6 +132,8 @@ impl Data {
         }
         self.cursor.row += 1;
         self.clamp_physical_column();
+
+        self.check_invariants();
     }
 
     pub fn move_cursor_left(&mut self) {
@@ -96,6 +142,8 @@ impl Data {
         }
         self.cursor.physical_column -= 1;
         self.cursor.logical_column = self.cursor.physical_column;
+
+        self.check_invariants();
     }
 
     pub fn move_cursor_right(&mut self) {
@@ -104,6 +152,8 @@ impl Data {
         }
         self.cursor.physical_column += 1;
         self.cursor.logical_column = self.cursor.physical_column;
+
+        self.check_invariants();
     }
 
     fn row_len(&self, row: usize) -> usize {
@@ -121,6 +171,60 @@ impl Data {
 
     pub fn get_physical_column(&self) -> usize {
         self.cursor.physical_column
+    }
+
+    #[inline(always)]
+    fn check_invariants(&self) {
+        self.debug_check_invariants();
+    }
+
+    #[cfg(debug_assertions)]
+    fn debug_check_invariants(&self) {
+        assert!(
+            self.cursor.row < self.data.len(),
+            "Debug assertion: Cursor row out of bounds"
+        );
+        assert!(
+            self.cursor.physical_column <= self.row_len(self.cursor.row),
+            "Debug assertion: Cursor physical column out of bounds"
+        );
+        assert!(
+            self.cursor.logical_column <= self.cursor.physical_column,
+            "Debug assertion: Cursor logical column out of bounds"
+        );
+
+        let rows = self.data.len();
+        let last_row = rows - 1;
+
+        for (row_index, row) in self.data.iter().enumerate() {
+            let cols = row.chars().count();
+            let last_col = cols - 1;
+
+            for (col_index, col) in row.chars().enumerate() {
+                let is_newline = col == NEWLINE;
+                let is_last_col = col_index == last_col;
+                assert!(
+                    !is_newline || is_last_col,
+                    "Debug assertion: internal newline in row {}",
+                    row_index
+                );
+            }
+
+            let ends_with_newline = row.ends_with(NEWLINE);
+            let is_last_row = row_index == last_row;
+            if is_last_row {
+                assert!(
+                    !ends_with_newline,
+                    "Debug assertion: last row must not end with a newline"
+                );
+            } else {
+                assert!(
+                    ends_with_newline,
+                    "Debug assertion: row {} must end with a newline",
+                    row_index
+                );
+            }
+        }
     }
 }
 

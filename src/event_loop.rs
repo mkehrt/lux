@@ -1,11 +1,13 @@
 use anyhow::Result;
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 
+use crate::data::Dirty;
 use crate::state::State;
 use crate::terminal;
 
 pub fn event_loop(mut state: State) -> Result<()> {
     loop {
+        let mut dirty = Dirty::Clean;
         let event = terminal::read_event()?;
 
         match event {
@@ -23,7 +25,7 @@ pub fn event_loop(mut state: State) -> Result<()> {
                 kind: KeyEventKind::Press,
                 state: _,
             }) => {
-                state.handle_text(c)?;
+                dirty = state.handle_text(c)?;
             }
             Event::Key(KeyEvent {
                 code: KeyCode::Enter,
@@ -31,7 +33,7 @@ pub fn event_loop(mut state: State) -> Result<()> {
                 kind: KeyEventKind::Press,
                 state: _,
             }) => {
-                state.handle_enter()?;
+                dirty = state.handle_enter()?;
             }
             Event::Key(KeyEvent {
                 code: code @ (KeyCode::Up | KeyCode::Down | KeyCode::Left | KeyCode::Right),
@@ -47,6 +49,14 @@ pub fn event_loop(mut state: State) -> Result<()> {
             other_event => {
                 state.handle_unknown_event(other_event)?;
             }
+        }
+
+        if dirty == Dirty::Dirty {
+            let text = state.render()?;
+            terminal::write_screen(&text)?;
+            state.write_status_line(&format!("DIRTY"))?;
+        } else {
+            state.write_status_line(&format!("CLEAN"))?;
         }
     }
 }

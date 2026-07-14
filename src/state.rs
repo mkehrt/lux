@@ -2,6 +2,7 @@ use anyhow::Result;
 use crossterm::event::{Event, KeyCode};
 
 use crate::data;
+use crate::data::Dirty;
 use crate::terminal;
 
 pub struct State {
@@ -23,11 +24,23 @@ impl State {
         }
     }
 
+    pub fn write_status_line(&self, text: &str) -> Result<()> {
+        terminal::write_status_line(text, self.terminal_size.rows - 1)
+    }
+
     fn update_cursor(&mut self) -> Result<()> {
         let row = self.data.get_row();
         let physical_column = self.data.get_physical_column();
 
         terminal::move_cursor_to(physical_column as u16, row as u16)
+    }
+
+    pub fn render(&self) -> Result<String> {
+        self.data.render(
+            0,
+            self.terminal_size.rows as usize,
+            self.terminal_size.cols as usize,
+        )
     }
 
     pub fn handle_ctrl_c(&mut self) {
@@ -37,17 +50,17 @@ impl State {
         std::process::exit(130);
     }
 
-    pub fn handle_text(&mut self, c: char) -> Result<()> {
+    pub fn handle_text(&mut self, c: char) -> Result<Dirty> {
         terminal::write_char(c)?;
-        self.data.insert_char(c)?;
+        let dirty = self.data.insert_char(c)?;
         self.update_cursor()?;
-        Ok(())
+        Ok(dirty)
     }
 
-    pub fn handle_enter(&mut self) -> Result<()> {
-        self.data.insert_newline()?;
+    pub fn handle_enter(&mut self) -> Result<Dirty> {
+        let dirty = self.data.insert_newline()?;
         self.update_cursor()?;
-        Ok(())
+        Ok(dirty)
     }
 
     pub fn handle_arrow(&mut self, code: KeyCode) -> Result<()> {
@@ -67,20 +80,21 @@ impl State {
     }
 
     pub fn handle_unknown_event(&mut self, event: Event) -> Result<()> {
-        terminal::print_debug_line(&format!("{:?}", event), self.terminal_size.rows - 1)
+        self.write_status_line(&format!("{:?}", event))?;
+        Ok(())
     }
 }
 
 #[derive(Debug)]
 pub struct TerminalSize {
     rows: u16,
-    #[allow(unused)]
     cols: u16,
 }
 
-pub fn get_terminal_size() -> Result<TerminalSize> {
-    let (cols, rows) = terminal::size()?;
-    Ok(TerminalSize { cols, rows })
+impl TerminalSize {
+    pub fn new(cols: u16, rows: u16) -> Self {
+        Self { cols, rows }
+    }
 }
 
 pub struct PreviousTerminalState {
