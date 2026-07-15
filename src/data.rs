@@ -23,26 +23,26 @@ pub enum Dirty {
 }
 
 impl Data {
-    pub fn render(&self, start_row: usize, rows: usize, cols: usize) -> Result<String> {
+    pub fn render(&self, data_start_row: usize, rendered_rows: usize, rendered_cols: usize) -> Result<String> {
         self.check_invariants();
 
         let mut result = String::new();
-        let end_row = start_row + rows;
-        let mut data_row = start_row;
-        let mut rendered_row = start_row;
-        while data_row < self.data.len() && rendered_row < end_row {
+
+        let mut data_row = data_start_row;
+        let mut rendered_row = 0;
+
+        while data_row < self.data.len() && rendered_row < rendered_rows {
             let row_data = &self.data[data_row];
             let mut chunk_start = 0;
             let mut row_done = false;
-            while !row_done && rendered_row < end_row {
-                let chunk_end = (chunk_start + cols).min(row_data.len());
+
+            while !row_done && rendered_row < rendered_rows {
+                let chunk_end = (chunk_start + rendered_cols).min(row_data.len());
                 result.push_str(&row_data[chunk_start..chunk_end]);
+                result.push_str ("\r\n");
+
                 rendered_row += 1;
                 row_done = chunk_end >= row_data.len();
-
-                if !row_done {
-                    result.push('\n');
-                }
 
                 chunk_start = chunk_end;
             }
@@ -85,10 +85,9 @@ impl Data {
         Ok(dirty)
     }
 
+    /// Does not literally insert a newline, but rather splits the current row
+    /// at the cursor position and inserts a new row after the current row.
     pub fn insert_newline(&mut self) -> Result<Dirty> {
-        // Insert a newline at the current cursor position
-        self.write(NEWLINE)?;
-
         let row = self
             .data
             .get_mut(self.cursor.row)
@@ -175,6 +174,7 @@ impl Data {
 
     #[inline(always)]
     fn check_invariants(&self) {
+        #[cfg(debug_assertions)]
         self.debug_check_invariants();
     }
 
@@ -185,42 +185,20 @@ impl Data {
             "Debug assertion: Cursor row out of bounds"
         );
         assert!(
-            self.cursor.physical_column <= self.row_len(self.cursor.row),
-            "Debug assertion: Cursor physical column out of bounds"
+            self.cursor.physical_column <= self.cursor.logical_column,
+            "Debug assertion: Cursor physical column greater than logical column"
         );
         assert!(
-            self.cursor.logical_column <= self.cursor.physical_column,
-            "Debug assertion: Cursor logical column out of bounds"
+            self.cursor.physical_column <= self.row_len(self.cursor.row),
+            "Debug assertion: Cursor physical column greater than row length"
         );
 
-        let rows = self.data.len();
-        let last_row = rows - 1;
-
         for (row_index, row) in self.data.iter().enumerate() {
-            let cols = row.chars().count();
-            let last_col = cols - 1;
-
-            for (col_index, col) in row.chars().enumerate() {
-                let is_newline = col == NEWLINE;
-                let is_last_col = col_index == last_col;
+            for ch in row.chars() {
+                let is_newline = ch == '\n' || ch == '\r';
                 assert!(
-                    !is_newline || is_last_col,
-                    "Debug assertion: internal newline in row {}",
-                    row_index
-                );
-            }
-
-            let ends_with_newline = row.ends_with(NEWLINE);
-            let is_last_row = row_index == last_row;
-            if is_last_row {
-                assert!(
-                    !ends_with_newline,
-                    "Debug assertion: last row must not end with a newline"
-                );
-            } else {
-                assert!(
-                    ends_with_newline,
-                    "Debug assertion: row {} must end with a newline",
+                    !is_newline,
+                    "Debug assertion: newline in row {}",
                     row_index
                 );
             }

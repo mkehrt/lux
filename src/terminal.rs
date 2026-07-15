@@ -54,7 +54,6 @@ pub fn write_screen(text: &str) -> Result<()> {
         cursor::SavePosition,
         cursor::MoveTo(0, 0),
     )?;
-    let text = text.replace('\n', "\r\n");
     write!(io::stdout(), "{}", text)?;
     execute!(io::stdout(), cursor::RestorePosition)?;
     Ok(())
