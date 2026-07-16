@@ -13,6 +13,7 @@ fn main() -> Result<()> {
     let terminal_size = state::TerminalSize::new(cols, rows);
     let data = data::Data::default();
     let state = State::new(previous_terminal_state, terminal_size, data);
+    state.write_status_line(&format!("{}x{}", cols, rows)).unwrap();
 
     event_loop::event_loop(state)
 }

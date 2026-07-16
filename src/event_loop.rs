@@ -45,6 +45,7 @@ pub fn event_loop(mut state: State) -> Result<()> {
             }
             Event::Resize(cols, rows) => {
                 state.handle_resize(cols, rows);
+                dirty = Dirty::Dirty;
             }
             other_event => {
                 state.handle_unknown_event(other_event)?;
@@ -54,9 +55,6 @@ pub fn event_loop(mut state: State) -> Result<()> {
         if dirty == Dirty::Dirty {
             let text = state.render()?;
             terminal::write_screen(&text)?;
-            state.write_status_line(&format!("DIRTY"))?;
-        } else {
-            state.write_status_line(&format!("CLEAN"))?;
         }
     }
 }
