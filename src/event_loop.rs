@@ -55,6 +55,7 @@ pub fn event_loop(mut state: State) -> Result<()> {
         if dirty == Dirty::Dirty {
             let text = state.render()?;
             terminal::write_screen(&text)?;
+            state.update_cursor()?;
         }
     }
 }

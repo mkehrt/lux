@@ -22,9 +22,17 @@ pub enum Dirty {
     Clean,
 }
 
+pub struct RenderedData {
+    data: Vec<String>,
+    cursor: Cursor,
+}
+
 impl Data {
-    pub fn render(&self, data_start_row: usize, rendered_rows: usize, rendered_cols: usize) -> Result<String> {
+    pub fn render(&self, data_start_row: usize, rendered_rows: u16, rendered_cols: u16) -> Result<String> {
         self.check_invariants();
+
+        let rendered_rows = rendered_rows as usize;
+        let rendered_cols = rendered_cols as usize;
 
         let mut result = String::new();
 
@@ -49,6 +57,33 @@ impl Data {
             data_row += 1;
         }
         Ok(result)
+    }
+
+    /// Maps the cursor to terminal coordinates, accounting for data rows that
+    /// wrap into multiple rendered rows. Returns (row, column).
+    pub fn rendered_cursor_position(&self, cols: u16) -> (u16, u16) {
+        let cols = cols as usize;
+
+        let mut rendered_row = 0;
+
+        let mut data_row = 0;
+        while data_row < self.cursor.row {
+            let len = self.row_len(data_row);
+            rendered_row += Self::rendered_lines(len, cols);
+            data_row += 1;
+        }
+
+        let wrapped_rows = self.cursor.physical_column / cols;
+        let cursor_row = (rendered_row + wrapped_rows) as u16;
+        let cursor_column = (self.cursor.physical_column % cols) as u16;
+
+        (cursor_row, cursor_column)
+    }
+
+    /// The number of rendered rows a data row of length `len` occupies.
+    fn rendered_lines(len: usize, cols: usize) -> usize {
+        let chunks = len.div_ceil(cols);
+        chunks.max(1)
     }
 
     fn write(&mut self, text: char) -> Result<Dirty> {

@@ -28,19 +28,16 @@ impl State {
         terminal::write_status_line(text, self.terminal_size.rows - 1)
     }
 
-    fn update_cursor(&mut self) -> Result<()> {
-        let row = self.data.get_row();
-        let physical_column = self.data.get_physical_column();
+    pub fn update_cursor(&mut self) -> Result<()> {
+        let cols = self.terminal_size.cols;
+        let (row, column) = self.data.rendered_cursor_position(cols);
 
-        terminal::move_cursor_to(physical_column as u16, row as u16)
+        terminal::move_cursor_to(column, row)
     }
 
     pub fn render(&self) -> Result<String> {
-        self.data.render(
-            0,
-            self.terminal_size.rows as usize,
-            self.terminal_size.cols as usize,
-        )
+        self.data
+            .render(0, self.terminal_size.rows, self.terminal_size.cols)
     }
 
     pub fn handle_ctrl_c(&mut self) {
@@ -52,7 +49,14 @@ impl State {
 
     pub fn handle_text(&mut self, c: char) -> Result<Dirty> {
         terminal::write_char(c)?;
-        let dirty = self.data.insert_char(c)?;
+        let mut dirty = self.data.insert_char(c)?;
+
+        let cols = self.terminal_size.cols as usize;
+        let cursor_off_edge = self.data.get_physical_column() >= cols;
+        if cursor_off_edge {
+            dirty = Dirty::Dirty;
+        }
+
         self.update_cursor()?;
         Ok(dirty)
     }
