@@ -67,6 +67,12 @@ impl State {
         Ok(dirty)
     }
 
+    pub fn handle_backspace(&mut self) -> Result<Dirty> {
+        let dirty = self.data.delete_char()?;
+        self.update_cursor()?;
+        Ok(dirty)
+    }
+
     pub fn handle_arrow(&mut self, code: KeyCode) -> Result<()> {
         match code {
             KeyCode::Up => self.data.move_cursor_up(),

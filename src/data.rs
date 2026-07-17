@@ -146,6 +146,39 @@ impl Data {
         Ok(Dirty::Dirty)
     }
 
+    /// Deletes the character before the cursor. At the start of a row, joins
+    /// the row with the row above instead.
+    pub fn delete_char(&mut self) -> Result<Dirty> {
+        let dirty;
+
+        if self.cursor.physical_column > 0 {
+            let row = self
+                .data
+                .get_mut(self.cursor.row)
+                .ok_or_else(|| anyhow::anyhow!("Failed to get row: {}", self.cursor.row))?;
+            row.remove(self.cursor.physical_column - 1);
+
+            self.cursor.physical_column -= 1;
+            self.cursor.logical_column = self.cursor.physical_column;
+            dirty = Dirty::Dirty;
+        } else if self.cursor.row > 0 {
+            let row = self.data.remove(self.cursor.row);
+            let previous_row = self.cursor.row - 1;
+            let previous_len = self.row_len(previous_row);
+            self.data[previous_row].push_str(&row);
+
+            self.cursor.row = previous_row;
+            self.cursor.physical_column = previous_len;
+            self.cursor.logical_column = previous_len;
+            dirty = Dirty::Dirty;
+        } else {
+            dirty = Dirty::Clean;
+        }
+
+        self.check_invariants();
+        Ok(dirty)
+    }
+
     pub fn concatenate(&self) -> String {
         self.data.concat()
     }

@@ -36,6 +36,14 @@ pub fn event_loop(mut state: State) -> Result<()> {
                 dirty = state.handle_enter()?;
             }
             Event::Key(KeyEvent {
+                code: KeyCode::Backspace,
+                modifiers: KeyModifiers::NONE,
+                kind: KeyEventKind::Press,
+                state: _,
+            }) => {
+                dirty = state.handle_backspace()?;
+            }
+            Event::Key(KeyEvent {
                 code: code @ (KeyCode::Up | KeyCode::Down | KeyCode::Left | KeyCode::Right),
                 modifiers: KeyModifiers::NONE,
                 kind: KeyEventKind::Press,
