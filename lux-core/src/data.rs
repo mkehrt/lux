@@ -1,7 +1,5 @@
 use anyhow::Result;
 
-const NEWLINE: char = '\n';
-
 pub struct Data {
     data: Vec<String>,
     cursor: Cursor,
@@ -20,11 +18,6 @@ impl Default for Data {
 pub enum Dirty {
     Dirty,
     Clean,
-}
-
-pub struct RenderedData {
-    data: Vec<String>,
-    cursor: Cursor,
 }
 
 impl Data {
@@ -177,10 +170,6 @@ impl Data {
 
         self.check_invariants();
         Ok(dirty)
-    }
-
-    pub fn concatenate(&self) -> String {
-        self.data.concat()
     }
 
     pub fn move_cursor_up(&mut self) {
