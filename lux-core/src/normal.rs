@@ -13,25 +13,25 @@ pub fn handle_event<T: Terminal>(state: &mut State<T>, event: Event) -> Result<D
             code: KeyCode::Char('h'),
             modifiers: KeyModifiers::None,
         }) => {
-            state.handle_arrow(KeyCode::Left)?;
+            state.handle_left()?;
         }
         Event::Key(KeyEvent {
             code: KeyCode::Char('j'),
             modifiers: KeyModifiers::None,
         }) => {
-            state.handle_arrow(KeyCode::Down)?;
+            state.handle_down()?;
         }
         Event::Key(KeyEvent {
             code: KeyCode::Char('k'),
             modifiers: KeyModifiers::None,
         }) => {
-            state.handle_arrow(KeyCode::Up)?;
+            state.handle_up()?;
         }
         Event::Key(KeyEvent {
             code: KeyCode::Char('l'),
             modifiers: KeyModifiers::None,
         }) => {
-            state.handle_arrow(KeyCode::Right)?;
+            state.handle_right()?;
         }
         Event::Key(KeyEvent {
             code: KeyCode::Char('i'),
@@ -43,7 +43,7 @@ pub fn handle_event<T: Terminal>(state: &mut State<T>, event: Event) -> Result<D
             code: KeyCode::Char('a'),
             modifiers: KeyModifiers::None,
         }) => {
-            state.handle_arrow(KeyCode::Right)?;
+            state.handle_right()?;
             state.set_mode(Mode::Insert);
         }
         Event::Resize(cols, rows) => {

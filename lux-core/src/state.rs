@@ -93,16 +93,24 @@ impl<T: Terminal> State<T> {
         Ok(dirty)
     }
 
-    pub fn handle_arrow(&mut self, code: key::KeyCode) -> Result<()> {
-        match code {
-            key::KeyCode::Up => self.data.move_cursor_up(),
-            key::KeyCode::Down => self.data.move_cursor_down(),
-            key::KeyCode::Left => self.data.move_cursor_left(),
-            key::KeyCode::Right => self.data.move_cursor_right(),
-            _ => return Err(anyhow::anyhow!("Invalid arrow key: {:?}", code)),
-        }
-        self.update_cursor()?;
-        Ok(())
+    pub fn handle_up(&mut self) -> Result<()> {
+        self.data.move_cursor_up();
+        self.update_cursor()
+    }
+
+    pub fn handle_down(&mut self) -> Result<()> {
+        self.data.move_cursor_down();
+        self.update_cursor()
+    }
+
+    pub fn handle_left(&mut self) -> Result<()> {
+        self.data.move_cursor_left();
+        self.update_cursor()
+    }
+
+    pub fn handle_right(&mut self) -> Result<()> {
+        self.data.move_cursor_right();
+        self.update_cursor()
     }
 
     pub fn handle_resize(&mut self, cols: u16, rows: u16) {

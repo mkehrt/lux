@@ -34,10 +34,28 @@ pub fn handle_event<T: Terminal>(state: &mut State<T>, event: Event) -> Result<D
             dirty = state.handle_backspace()?;
         }
         Event::Key(KeyEvent {
-            code: code @ (KeyCode::Up | KeyCode::Down | KeyCode::Left | KeyCode::Right),
+            code: KeyCode::Up,
             modifiers: KeyModifiers::None,
         }) => {
-            state.handle_arrow(code)?;
+            state.handle_up()?;
+        }
+        Event::Key(KeyEvent {
+            code: KeyCode::Down,
+            modifiers: KeyModifiers::None,
+        }) => {
+            state.handle_down()?;
+        }
+        Event::Key(KeyEvent {
+            code: KeyCode::Left,
+            modifiers: KeyModifiers::None,
+        }) => {
+            state.handle_left()?;
+        }
+        Event::Key(KeyEvent {
+            code: KeyCode::Right,
+            modifiers: KeyModifiers::None,
+        }) => {
+            state.handle_right()?;
         }
         Event::Resize(cols, rows) => {
             state.handle_resize(cols, rows);
