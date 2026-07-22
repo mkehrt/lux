@@ -115,7 +115,6 @@ impl<T: Terminal> State<T> {
 
     pub fn handle_resize(&mut self, cols: u16, rows: u16) {
         self.terminal_size = TerminalSize { cols, rows };
-        self.write_status_line(&format!("{}x{}", cols, rows)).unwrap();
     }
 
     pub fn handle_unknown_event(&mut self, event: key::Event) -> Result<()> {
