@@ -1,11 +1,11 @@
 use anyhow::Result;
-use crossterm::event::{Event, KeyCode};
 
 use crate::data;
 use crate::data::Dirty;
 use crate::insert;
+use crate::key;
 use crate::normal;
-use crate::terminal;
+use crate::terminal::Terminal;
 
 #[derive(Debug, PartialEq)]
 pub enum Mode {
@@ -13,36 +13,33 @@ pub enum Mode {
     Normal,
 }
 
-pub struct State {
+pub struct State<T: Terminal> {
     data: data::Data,
     mode: Mode,
-    previous_terminal_state: PreviousTerminalState,
+    terminal: T,
     terminal_size: TerminalSize,
 }
 
-impl State {
-    pub fn new(
-        previous_terminal_state: PreviousTerminalState,
-        terminal_size: TerminalSize,
-        data: data::Data,
-    ) -> Self {
+impl<T: Terminal> State<T> {
+    pub fn new(terminal: T, terminal_size: TerminalSize, data: data::Data) -> Self {
         Self {
-            previous_terminal_state,
+            terminal,
             terminal_size,
             data,
             mode: Mode::Insert,
         }
     }
 
-    pub fn write_status_line(&self, text: &str) -> Result<()> {
-        terminal::write_status_line(text, self.terminal_size.rows - 1)
+    pub fn write_status_line(&mut self, text: &str) -> Result<()> {
+        let bottom_row = self.terminal_size.rows - 1;
+        self.terminal.write_status_line(text, bottom_row)
     }
 
     pub fn update_cursor(&mut self) -> Result<()> {
         let cols = self.terminal_size.cols;
         let (row, column) = self.data.rendered_cursor_position(cols);
 
-        terminal::move_cursor_to(column, row)
+        self.terminal.move_cursor_to(column, row)
     }
 
     pub fn render(&self) -> Result<String> {
@@ -50,7 +47,16 @@ impl State {
             .render(0, self.terminal_size.rows, self.terminal_size.cols)
     }
 
-    pub fn handle_event(&mut self, event: Event) -> Result<Dirty> {
+    /// Renders the current data and draws it to the terminal, then repositions
+    /// the cursor.
+    pub fn redraw(&mut self) -> Result<()> {
+        let text = self.render()?;
+        self.terminal.write_screen(&text)?;
+        self.update_cursor()?;
+        Ok(())
+    }
+
+    pub fn handle_event(&mut self, event: key::Event) -> Result<Dirty> {
         match self.mode {
             Mode::Insert => insert::handle_event(self, event),
             Mode::Normal => normal::handle_event(self, event),
@@ -61,15 +67,8 @@ impl State {
         self.mode = mode;
     }
 
-    pub fn handle_ctrl_c(&mut self) {
-        if let Err(e) = self.previous_terminal_state.restore() {
-            eprintln!("Error restoring terminal state: {}", e);
-        }
-        std::process::exit(130);
-    }
-
     pub fn handle_text(&mut self, c: char) -> Result<Dirty> {
-        terminal::write_char(c)?;
+        self.terminal.write_char(c)?;
         let mut dirty = self.data.insert_char(c)?;
 
         let cols = self.terminal_size.cols as usize;
@@ -94,12 +93,12 @@ impl State {
         Ok(dirty)
     }
 
-    pub fn handle_arrow(&mut self, code: KeyCode) -> Result<()> {
+    pub fn handle_arrow(&mut self, code: key::KeyCode) -> Result<()> {
         match code {
-            KeyCode::Up => self.data.move_cursor_up(),
-            KeyCode::Down => self.data.move_cursor_down(),
-            KeyCode::Left => self.data.move_cursor_left(),
-            KeyCode::Right => self.data.move_cursor_right(),
+            key::KeyCode::Up => self.data.move_cursor_up(),
+            key::KeyCode::Down => self.data.move_cursor_down(),
+            key::KeyCode::Left => self.data.move_cursor_left(),
+            key::KeyCode::Right => self.data.move_cursor_right(),
             _ => return Err(anyhow::anyhow!("Invalid arrow key: {:?}", code)),
         }
         self.update_cursor()?;
@@ -108,10 +107,10 @@ impl State {
 
     pub fn handle_resize(&mut self, cols: u16, rows: u16) {
         self.terminal_size = TerminalSize { cols, rows };
-       self.write_status_line(&format!("{}x{}", cols, rows)).unwrap();
+        self.write_status_line(&format!("{}x{}", cols, rows)).unwrap();
     }
 
-    pub fn handle_unknown_event(&mut self, event: Event) -> Result<()> {
+    pub fn handle_unknown_event(&mut self, event: key::Event) -> Result<()> {
         self.write_status_line(&format!("{:?}", event))?;
         Ok(())
     }
@@ -127,30 +126,4 @@ impl TerminalSize {
     pub fn new(cols: u16, rows: u16) -> Self {
         Self { cols, rows }
     }
-}
-
-pub struct PreviousTerminalState {
-    raw_mode_was_enabled: bool,
-}
-
-impl PreviousTerminalState {
-    fn restore(&mut self) -> Result<()> {
-        terminal::leave_alternate_screen()?;
-        if self.raw_mode_was_enabled {
-            terminal::enable_raw_mode()?;
-        } else {
-            terminal::disable_raw_mode()?;
-        }
-        println!("Restored terminal state");
-        Ok(())
-    }
-}
-
-pub fn set_up_terminal() -> Result<PreviousTerminalState> {
-    let raw_mode_was_enabled = terminal::is_raw_mode_enabled()?;
-    terminal::enable_raw_mode()?;
-    terminal::enter_alternate_screen()?;
-    Ok(PreviousTerminalState {
-        raw_mode_was_enabled,
-    })
 }

@@ -1,21 +1,22 @@
 use anyhow::Result;
 
-mod data;
 mod event_loop;
-mod insert;
-mod normal;
-mod state;
+mod key_translation;
 mod terminal;
 
-use state::State;
+use lux_core::data::Data;
+use lux_core::state::{State, TerminalSize};
+
+use terminal::CrosstermTerminal;
 
 fn main() -> Result<()> {
-    let previous_terminal_state = state::set_up_terminal()?;
+    let previous_terminal_state = terminal::set_up_terminal()?;
     let (cols, rows) = terminal::size()?;
-    let terminal_size = state::TerminalSize::new(cols, rows);
-    let data = data::Data::default();
-    let state = State::new(previous_terminal_state, terminal_size, data);
-    state.write_status_line(&format!("{}x{}", cols, rows)).unwrap();
+    let terminal_size = TerminalSize::new(cols, rows);
+    let crossterm_terminal = CrosstermTerminal;
+    let data = Data::default();
+    let mut state = State::new(crossterm_terminal, terminal_size, data);
+    state.write_status_line(&format!("{}x{}", cols, rows))?;
 
-    event_loop::event_loop(state)
+    event_loop::event_loop(state, previous_terminal_state)
 }

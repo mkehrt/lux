@@ -1,31 +1,43 @@
 use anyhow::Result;
-use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
+use crossterm::event::{Event, KeyCode, KeyEventKind, KeyModifiers};
 
-use crate::data::Dirty;
-use crate::state::State;
-use crate::terminal;
+use lux_core::data::Dirty;
+use lux_core::state::State;
+use lux_core::terminal::Terminal;
 
-pub fn event_loop(mut state: State) -> Result<()> {
+use crate::key_translation;
+use crate::terminal::{self, PreviousTerminalState};
+
+pub fn event_loop<T: Terminal>(
+    mut state: State<T>,
+    previous: PreviousTerminalState,
+) -> Result<()> {
     loop {
         let event = terminal::read_event()?;
 
-        let dirty = match event {
-            Event::Key(KeyEvent {
-                code: KeyCode::Char('c'),
-                modifiers: KeyModifiers::CONTROL,
-                kind: KeyEventKind::Press,
-                state: _,
-            }) => {
-                state.handle_ctrl_c();
-                Dirty::Clean
-            }
-            other_event => state.handle_event(other_event)?,
+        if is_ctrl_c(&event) {
+            previous.restore()?;
+            std::process::exit(130);
+        }
+
+        let translated = key_translation::translate_event(event);
+        let Some(event) = translated else {
+            continue;
         };
 
+        let dirty = state.handle_event(event)?;
         if dirty == Dirty::Dirty {
-            let text = state.render()?;
-            terminal::write_screen(&text)?;
-            state.update_cursor()?;
+            state.redraw()?;
         }
     }
+}
+
+fn is_ctrl_c(event: &Event) -> bool {
+    let Event::Key(key_event) = event else {
+        return false;
+    };
+    let is_char_c = key_event.code == KeyCode::Char('c');
+    let is_control = key_event.modifiers == KeyModifiers::CONTROL;
+    let is_press = key_event.kind == KeyEventKind::Press;
+    is_char_c && is_control && is_press
 }

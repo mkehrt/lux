@@ -136,6 +136,14 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "crossterm",
+ "lux-core",
+]
+
+[[package]]
+name = "lux-core"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
 ]
 
 [[package]]

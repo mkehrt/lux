@@ -3,6 +3,10 @@ name = "lux"
 version = "0.1.0"
 edition = "2024"
 
+[workspace]
+members = ["lux-core"]
+
 [dependencies]
 anyhow = "1.0.103"
 crossterm = "0.29.0"
+lux-core = { path = "lux-core" }
