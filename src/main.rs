@@ -2,6 +2,8 @@ use anyhow::Result;
 
 mod data;
 mod event_loop;
+mod insert;
+mod normal;
 mod state;
 mod terminal;
 

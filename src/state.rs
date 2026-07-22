@@ -3,10 +3,19 @@ use crossterm::event::{Event, KeyCode};
 
 use crate::data;
 use crate::data::Dirty;
+use crate::insert;
+use crate::normal;
 use crate::terminal;
+
+#[derive(Debug, PartialEq)]
+pub enum Mode {
+    Insert,
+    Normal,
+}
 
 pub struct State {
     data: data::Data,
+    mode: Mode,
     previous_terminal_state: PreviousTerminalState,
     terminal_size: TerminalSize,
 }
@@ -21,6 +30,7 @@ impl State {
             previous_terminal_state,
             terminal_size,
             data,
+            mode: Mode::Insert,
         }
     }
 
@@ -38,6 +48,17 @@ impl State {
     pub fn render(&self) -> Result<String> {
         self.data
             .render(0, self.terminal_size.rows, self.terminal_size.cols)
+    }
+
+    pub fn handle_event(&mut self, event: Event) -> Result<Dirty> {
+        match self.mode {
+            Mode::Insert => insert::handle_event(self, event),
+            Mode::Normal => normal::handle_event(self, event),
+        }
+    }
+
+    pub fn set_mode(&mut self, mode: Mode) {
+        self.mode = mode;
     }
 
     pub fn handle_ctrl_c(&mut self) {
