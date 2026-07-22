@@ -27,13 +27,13 @@ impl Count {
 
     pub fn accept_character(&mut self, ch: char) -> CharResult {
         let digit = ch.to_digit(10).map(|d| d as u64);
-        match (digit, *self) {
+        match (digit, self) {
             (Some(digit), Count::Empty) => {
                 *self = Count::Number(digit);
                 CharResult::Accepted
             }
             (Some(digit), Count::Number(old_number)) => {
-                let tens = old_number * 10;
+                let tens = *old_number * 10;
                 let ones = digit as u64;
                 let new_number = tens + ones;
                 *self = Count::Number(new_number);
@@ -49,7 +49,7 @@ impl InProgressSentence {
         InProgressSentence::Start
     }
 
-    pub fn accept_character(&mut self, ch: char) -> CharResult {
+    pub fn accept_character(&mut self, _ch: char) -> CharResult {
         unimplemented!()
     }
 
@@ -57,25 +57,25 @@ impl InProgressSentence {
         unimplemented!()
     }
 
-    pub fn execute<T: Terminal>(state: &mut State<T>) -> Result<()> {
+    pub fn execute<T: Terminal>(_state: &mut State<T>) {
         unimplemented!()
     }
 }
 
 trait Operator {
-    fn execute<T: Terminal>(state: &mut State<T>) -> Result<()>;
+    fn execute<T: Terminal>(state: &mut State<T>);
 }
 
 struct Delete;
 impl Operator for Delete {
-    fn execute<T: Terminal>(state: &mut State<T>) -> Result<()> {
+    fn execute<T: Terminal>(_state: &mut State<T>) {
         unimplemented!()
     }
 }
 
 struct Yank;
 impl Operator for Yank {
-    fn execute<T: Terminal>(state: &mut State<T>) -> Result<()> {
+    fn execute<T: Terminal>(_state: &mut State<T>) {
         unimplemented!()
     }
 }
