@@ -13,7 +13,7 @@ fn main() -> Result<()> {
     let previous_terminal_state = terminal::set_up_terminal()?;
     let (cols, rows) = terminal::size()?;
     let terminal_size = TerminalSize::new(cols, rows);
-    let crossterm_terminal = CrosstermTerminal;
+    let crossterm_terminal = Box::new(CrosstermTerminal);
     let data = Data::default();
     let state = State::new(crossterm_terminal, terminal_size, data);
 

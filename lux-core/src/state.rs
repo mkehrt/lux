@@ -5,6 +5,7 @@ use crate::data::Dirty;
 use crate::insert;
 use crate::key;
 use crate::normal;
+use crate::sentence::{CharResult, InProgressSentence};
 use crate::terminal::Terminal;
 
 #[derive(Debug, PartialEq)]
@@ -13,20 +14,33 @@ pub enum Mode {
     Normal,
 }
 
-pub struct State<T: Terminal> {
+/// The result of feeding a character to the Normal-mode sentence parser.
+#[derive(Debug, PartialEq)]
+pub enum SentenceOutcome {
+    /// The character extended an in-progress sentence but did not complete it.
+    Pending,
+    /// The character completed a sentence, which was executed.
+    Executed,
+    /// The character is not part of a sentence; the caller should handle it.
+    NotConsumed,
+}
+
+pub struct State {
     data: data::Data,
     mode: Mode,
-    terminal: T,
+    sentence: InProgressSentence,
+    terminal: Box<dyn Terminal>,
     terminal_size: TerminalSize,
 }
 
-impl<T: Terminal> State<T> {
-    pub fn new(terminal: T, terminal_size: TerminalSize, data: data::Data) -> Self {
+impl State {
+    pub fn new(terminal: Box<dyn Terminal>, terminal_size: TerminalSize, data: data::Data) -> Self {
         Self {
             terminal,
             terminal_size,
             data,
             mode: Mode::Insert,
+            sentence: InProgressSentence::new(),
         }
     }
 
@@ -65,6 +79,27 @@ impl<T: Terminal> State<T> {
 
     pub fn set_mode(&mut self, mode: Mode) {
         self.mode = mode;
+    }
+
+    /// Feeds a character to the Normal-mode sentence parser. A completed
+    /// sentence is executed immediately.
+    pub fn feed_sentence(&mut self, ch: char) -> Result<SentenceOutcome> {
+        let result = self.sentence.accept_character(ch);
+        match result {
+            CharResult::Rejected => {
+                self.sentence = InProgressSentence::new();
+                Ok(SentenceOutcome::NotConsumed)
+            }
+            CharResult::Accepted => {
+                if self.sentence.is_complete() {
+                    let sentence = std::mem::take(&mut self.sentence);
+                    sentence.execute(self)?;
+                    Ok(SentenceOutcome::Executed)
+                } else {
+                    Ok(SentenceOutcome::Pending)
+                }
+            }
+        }
     }
 
     pub fn handle_text(&mut self, c: char) -> Result<Dirty> {

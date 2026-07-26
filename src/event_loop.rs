@@ -3,13 +3,12 @@ use crossterm::event::{Event, KeyCode, KeyEventKind, KeyModifiers};
 
 use lux_core::data::Dirty;
 use lux_core::state::State;
-use lux_core::terminal::Terminal;
 
 use crate::key_translation;
 use crate::terminal::{self, PreviousTerminalState};
 
-pub fn event_loop<T: Terminal>(
-    mut state: State<T>,
+pub fn event_loop(
+    mut state: State,
     previous: PreviousTerminalState,
 ) -> Result<()> {
     loop {

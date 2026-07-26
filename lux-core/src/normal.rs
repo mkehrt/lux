@@ -2,49 +2,20 @@ use anyhow::Result;
 
 use crate::data::Dirty;
 use crate::key::{Event, KeyCode, KeyEvent, KeyModifiers};
-use crate::state::{Mode, State};
-use crate::terminal::Terminal;
+use crate::state::{Mode, SentenceOutcome, State};
 
-pub fn handle_event<T: Terminal>(state: &mut State<T>, event: Event) -> Result<Dirty> {
+pub fn handle_event(state: &mut State, event: Event) -> Result<Dirty> {
     let mut dirty = Dirty::Clean;
 
     match event {
         Event::Key(KeyEvent {
-            code: KeyCode::Char('h'),
+            code: KeyCode::Char(c),
             modifiers: KeyModifiers::None,
         }) => {
-            state.handle_left()?;
-        }
-        Event::Key(KeyEvent {
-            code: KeyCode::Char('j'),
-            modifiers: KeyModifiers::None,
-        }) => {
-            state.handle_down()?;
-        }
-        Event::Key(KeyEvent {
-            code: KeyCode::Char('k'),
-            modifiers: KeyModifiers::None,
-        }) => {
-            state.handle_up()?;
-        }
-        Event::Key(KeyEvent {
-            code: KeyCode::Char('l'),
-            modifiers: KeyModifiers::None,
-        }) => {
-            state.handle_right()?;
-        }
-        Event::Key(KeyEvent {
-            code: KeyCode::Char('i'),
-            modifiers: KeyModifiers::None,
-        }) => {
-            state.set_mode(Mode::Insert);
-        }
-        Event::Key(KeyEvent {
-            code: KeyCode::Char('a'),
-            modifiers: KeyModifiers::None,
-        }) => {
-            state.handle_right()?;
-            state.set_mode(Mode::Insert);
+            let outcome = state.feed_sentence(c)?;
+            if outcome == SentenceOutcome::NotConsumed {
+                handle_command_char(state, c)?;
+            }
         }
         Event::Resize(cols, rows) => {
             state.handle_resize(cols, rows);
@@ -56,4 +27,17 @@ pub fn handle_event<T: Terminal>(state: &mut State<T>, event: Event) -> Result<D
     }
 
     Ok(dirty)
+}
+
+/// Handles Normal-mode character commands that are not part of a sentence.
+fn handle_command_char(state: &mut State, c: char) -> Result<()> {
+    match c {
+        'i' => state.set_mode(Mode::Insert),
+        'a' => {
+            state.handle_right()?;
+            state.set_mode(Mode::Insert);
+        }
+        _ => {}
+    }
+    Ok(())
 }

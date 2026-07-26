@@ -3,9 +3,8 @@ use anyhow::Result;
 use crate::data::Dirty;
 use crate::key::{Event, KeyCode, KeyEvent, KeyModifiers};
 use crate::state::{Mode, State};
-use crate::terminal::Terminal;
 
-pub fn handle_event<T: Terminal>(state: &mut State<T>, event: Event) -> Result<Dirty> {
+pub fn handle_event(state: &mut State, event: Event) -> Result<Dirty> {
     let mut dirty = Dirty::Clean;
 
     match event {
