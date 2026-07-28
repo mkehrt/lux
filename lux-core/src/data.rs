@@ -1,6 +1,6 @@
 use anyhow::Result;
 
-pub struct Data {
+pub(crate) struct Data {
     data: Vec<String>,
     cursor: Cursor,
 }

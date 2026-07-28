@@ -1,7 +1,7 @@
 use anyhow::Result;
 
+use crate::data::Dirty;
 use crate::state::State;
-
 pub enum CharResult {
     Accepted,
     Rejected(char),
@@ -119,7 +119,7 @@ impl Sentence {
     }
 
     /// Takes a completed sentence
-    pub fn execute(self, _state: &mut State) -> Result<()> {
+    pub fn execute(self, _state: &mut State) -> Result<Dirty> {
         unimplemented!()
     }
 }

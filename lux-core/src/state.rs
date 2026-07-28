@@ -23,7 +23,7 @@ impl Mode {
 pub struct State {
     pub(crate) terminal: Box<dyn terminal::Terminal>,
     pub(crate) terminal_size: terminal::TerminalSize,
-    mode: Mode,
+    pub(crate) mode: Mode,
     pub(crate) data: data::Data,
 }
 
