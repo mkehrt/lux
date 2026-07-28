@@ -2,35 +2,22 @@ use anyhow::Result;
 
 use crate::data;
 use crate::data::Dirty;
-use crate::insert;
-use crate::key;
-use crate::normal;
-use crate::sentence::{CharResult, InProgressSentence};
+use crate::insert::Insert;
+use crate::key::{Event, KeyCode, KeyEvent, KeyModifiers};
+use crate::normal::Normal;
 use crate::terminal::Terminal;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub enum Mode {
-    Insert,
-    Normal,
-}
-
-/// The result of feeding a character to the Normal-mode sentence parser.
-#[derive(Debug, PartialEq)]
-pub enum SentenceOutcome {
-    /// The character extended an in-progress sentence but did not complete it.
-    Pending,
-    /// The character completed a sentence, which was executed.
-    Executed,
-    /// The character is not part of a sentence; the caller should handle it.
-    NotConsumed,
+    Normal(Normal),
+    Insert(Insert),
 }
 
 pub struct State {
-    data: data::Data,
+    pub(crate) data: data::Data,
     mode: Mode,
-    sentence: InProgressSentence,
-    terminal: Box<dyn Terminal>,
-    terminal_size: TerminalSize,
+    pub(crate) terminal: Box<dyn Terminal>,
+    pub(crate) terminal_size: TerminalSize,
 }
 
 impl State {
@@ -39,8 +26,7 @@ impl State {
             terminal,
             terminal_size,
             data,
-            mode: Mode::Insert,
-            sentence: InProgressSentence::new(),
+            mode: Mode::Normal(Normal::new()),
         }
     }
 
@@ -70,50 +56,81 @@ impl State {
         Ok(())
     }
 
-    pub fn handle_event(&mut self, event: key::Event) -> Result<Dirty> {
-        match self.mode {
-            Mode::Insert => insert::handle_event(self, event),
-            Mode::Normal => normal::handle_event(self, event),
+    pub fn handle_event(&mut self, event: Event) -> Result<Dirty> {
+        let mut dirty = Dirty::Clean;
+
+        match event {
+            Event::Key(KeyEvent {
+                code: KeyCode::Esc,
+                modifiers: KeyModifiers::None,
+            }) => {
+                self.set_mode(Mode::Normal(Normal::new()));
+            }
+            Event::Key(KeyEvent {
+                code: KeyCode::Char(c),
+                modifiers: KeyModifiers::None | KeyModifiers::Shift,
+            }) => {
+                dirty = self.handle_char(c)?;
+            }
+            Event::Key(KeyEvent {
+                code: KeyCode::Enter,
+                modifiers: KeyModifiers::None,
+            }) => {
+                dirty = self.handle_enter()?;
+            }
+            Event::Key(KeyEvent {
+                code: KeyCode::Backspace,
+                modifiers: KeyModifiers::None,
+            }) => {
+                dirty = self.handle_backspace()?;
+            }
+            Event::Key(KeyEvent {
+                code: KeyCode::Up,
+                modifiers: KeyModifiers::None,
+            }) => {
+                self.handle_up()?;
+            }
+            Event::Key(KeyEvent {
+                code: KeyCode::Down,
+                modifiers: KeyModifiers::None,
+            }) => {
+                self.handle_down()?;
+            }
+            Event::Key(KeyEvent {
+                code: KeyCode::Left,
+                modifiers: KeyModifiers::None,
+            }) => {
+                self.handle_left()?;
+            }
+            Event::Key(KeyEvent {
+                code: KeyCode::Right,
+                modifiers: KeyModifiers::None,
+            }) => {
+                self.handle_right()?;
+            }
+            Event::Resize(cols, rows) => {
+                self.handle_resize(cols, rows);
+                dirty = Dirty::Dirty;
+            }
+            other_event => {
+                self.handle_unknown_event(other_event)?;
+            }
+        }
+
+        Ok(dirty)
+    }
+
+    /// Dispatches a character to the handler for the current mode.
+    fn handle_char(&self, ch: char) -> Result<Dirty> {
+        match &mut self.mode {
+            This doesn't work
+            Mode::Normal(normal) => normal.handle_char(self, ch),
+            Mode::Insert(insert) => insert.handle_char(self, ch),
         }
     }
 
     pub fn set_mode(&mut self, mode: Mode) {
         self.mode = mode;
-    }
-
-    /// Feeds a character to the Normal-mode sentence parser. A completed
-    /// sentence is executed immediately.
-    pub fn feed_sentence(&mut self, ch: char) -> Result<SentenceOutcome> {
-        let result = self.sentence.accept_character(ch);
-        match result {
-            CharResult::Rejected => {
-                self.sentence = InProgressSentence::new();
-                Ok(SentenceOutcome::NotConsumed)
-            }
-            CharResult::Accepted => {
-                if self.sentence.is_complete() {
-                    let sentence = std::mem::take(&mut self.sentence);
-                    sentence.execute(self)?;
-                    Ok(SentenceOutcome::Executed)
-                } else {
-                    Ok(SentenceOutcome::Pending)
-                }
-            }
-        }
-    }
-
-    pub fn handle_text(&mut self, c: char) -> Result<Dirty> {
-        self.terminal.write_char(c)?;
-        let mut dirty = self.data.insert_char(c)?;
-
-        let cols = self.terminal_size.cols as usize;
-        let cursor_off_edge = self.data.get_physical_column() >= cols;
-        if cursor_off_edge {
-            dirty = Dirty::Dirty;
-        }
-
-        self.update_cursor()?;
-        Ok(dirty)
     }
 
     pub fn handle_enter(&mut self) -> Result<Dirty> {
@@ -152,7 +169,7 @@ impl State {
         self.terminal_size = TerminalSize { cols, rows };
     }
 
-    pub fn handle_unknown_event(&mut self, event: key::Event) -> Result<()> {
+    pub fn handle_unknown_event(&mut self, event: Event) -> Result<()> {
         self.write_status_line(&format!("{:?}", event))?;
         Ok(())
     }
@@ -161,7 +178,7 @@ impl State {
 #[derive(Debug)]
 pub struct TerminalSize {
     rows: u16,
-    cols: u16,
+    pub(crate) cols: u16,
 }
 
 impl TerminalSize {

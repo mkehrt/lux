@@ -1,43 +1,23 @@
 use anyhow::Result;
 
 use crate::data::Dirty;
-use crate::key::{Event, KeyCode, KeyEvent, KeyModifiers};
-use crate::state::{Mode, SentenceOutcome, State};
+use crate::sentence::InProgressSentence;
+use crate::state::State;
 
-pub fn handle_event(state: &mut State, event: Event) -> Result<Dirty> {
-    let mut dirty = Dirty::Clean;
-
-    match event {
-        Event::Key(KeyEvent {
-            code: KeyCode::Char(c),
-            modifiers: KeyModifiers::None,
-        }) => {
-            let outcome = state.feed_sentence(c)?;
-            if outcome == SentenceOutcome::NotConsumed {
-                handle_command_char(state, c)?;
-            }
-        }
-        Event::Resize(cols, rows) => {
-            state.handle_resize(cols, rows);
-            dirty = Dirty::Dirty;
-        }
-        other_event => {
-            state.handle_unknown_event(other_event)?;
-        }
-    }
-
-    Ok(dirty)
+#[derive(Debug)]
+pub struct Normal {
+    in_progress_sentence: InProgressSentence,
 }
 
-/// Handles Normal-mode character commands that are not part of a sentence.
-fn handle_command_char(state: &mut State, c: char) -> Result<()> {
-    match c {
-        'i' => state.set_mode(Mode::Insert),
-        'a' => {
-            state.handle_right()?;
-            state.set_mode(Mode::Insert);
+impl Normal {
+    pub fn new() -> Self {
+        let in_progress_sentence = InProgressSentence::new();
+        Normal {
+            in_progress_sentence,
         }
-        _ => {}
     }
-    Ok(())
+
+    pub fn handle_char(&mut self, _state: &mut State, _c: char) -> Result<Dirty> {
+        unimplemented!()
+    }
 }

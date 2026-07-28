@@ -4,18 +4,121 @@ use crate::state::State;
 
 pub enum CharResult {
     Accepted,
-    Rejected,
+    Rejected(char),
 }
 
-#[derive(Debug, Default)]
+#[derive(Copy, Clone, Debug)]
 pub enum InProgressSentence {
-    #[default]
-    Start,
-    Count(Count),
-    Complete(CountAndMotion),
+    ParsingCountForOperator {
+        operator_count: Count,
+    },
+    ParsingOperator {
+        operator_count: Count,
+        operator: Operator,
+    },
+    ParsingCountForMotion {
+        operator_count: Count,
+        operator: Operator,
+        motion_count: Count,
+    },
+    ParsingMotion {
+        operator_count: Count,
+        operator: Operator,
+        motion_count: Count,
+        motion: Motion,
+    },
 }
 
-#[derive(Debug, Default)]
+impl InProgressSentence {
+    pub fn new() -> Self {
+        InProgressSentence::ParsingCountForOperator {
+            operator_count: Count::Empty,
+        }
+    }
+
+    /// A complete sentence is one which either ends in a
+    ///   1. A complete operator, or
+    ///   2. A complete motion.
+    ///
+    /// A complete operator is one which is ready to execute, such as `dd`,
+    /// which does not require a motion.  An incomplete operator is one which
+    /// could be completed or which could be followed by a motion.  For example
+    /// `d` could be followed by a `d` for a complete operator, or by `j` (with
+    /// an optional count preceding it), a motion.
+    ///
+    /// A complete motion is one which is ready to execute, for example, `j`.
+    /// An incomplete motion is one which needs more characters, such as `i`,
+    /// which could be completed by, for example, 'w'.
+    pub fn is_complete(&self) -> bool {
+        match self {
+            InProgressSentence::ParsingCountForOperator { .. } => false,
+            InProgressSentence::ParsingOperator { operator, .. } => operator.is_complete(),
+            InProgressSentence::ParsingCountForMotion { .. } => false,
+            InProgressSentence::ParsingMotion { motion, .. } => motion.is_complete(),
+        }
+    }
+
+    pub fn accept_character(&mut self, ch: char) -> CharResult {
+        use CharResult::*;
+        use InProgressSentence::*;
+        match *self {
+            ParsingCountForOperator { mut operator_count } => {
+                if let Rejected(ch) = operator_count.accept_character(ch) {
+                    let operator = Operator::Empty;
+                    *self = ParsingOperator {
+                        operator_count,
+                        operator,
+                    };
+                    self.accept_character(ch)
+                } else {
+                    Accepted
+                }
+            }
+            ParsingOperator {
+                operator_count,
+                mut operator,
+            } => {
+                if let Rejected(ch) = operator.accept_character(ch) {
+                    let motion_count = Count::Empty;
+                    *self = ParsingCountForMotion {
+                        operator_count,
+                        operator,
+                        motion_count,
+                    };
+                    self.accept_character(ch)
+                } else {
+                    Accepted
+                }
+            }
+            ParsingCountForMotion {
+                operator_count,
+                operator,
+                mut motion_count,
+            } => {
+                if let Rejected(ch) = motion_count.accept_character(ch) {
+                    let motion = Motion::Empty;
+                    *self = ParsingMotion {
+                        operator_count,
+                        operator,
+                        motion_count,
+                        motion,
+                    };
+                    self.accept_character(ch)
+                } else {
+                    Accepted
+                }
+            }
+            ParsingMotion { mut motion, .. } => motion.accept_character(ch),
+        }
+    }
+
+    /// Takes a completed sentence
+    pub fn execute(self, _state: &mut State) -> Result<()> {
+        unimplemented!()
+    }
+}
+
+#[derive(Copy, Clone, Debug, Default)]
 pub enum Count {
     #[default]
     Empty,
@@ -38,7 +141,7 @@ impl Count {
             }
             (None, old) => {
                 *self = old;
-                CharResult::Rejected
+                CharResult::Rejected(ch)
             }
         }
     }
@@ -52,198 +155,47 @@ impl Count {
     }
 }
 
-impl InProgressSentence {
-    pub fn new() -> Self {
-        InProgressSentence::Start
-    }
+#[derive(Clone, Copy, Debug)]
+enum Operator {
+    Empty,
+}
 
+impl Operator {
     pub fn accept_character(&mut self, ch: char) -> CharResult {
-        if ch.is_ascii_digit() {
-            return self.accept_count_digit(ch);
-        }
-        if let Some(motion) = Motion::from_char(ch) {
-            return self.accept_motion(motion);
-        }
-        CharResult::Rejected
+        CharResult::Rejected(ch)
     }
 
-    fn accept_count_digit(&mut self, ch: char) -> CharResult {
-        match self {
-            InProgressSentence::Start => {
-                let mut count = Count::Empty;
-                let result = count.accept_character(ch);
-                *self = InProgressSentence::Count(count);
-                result
-            }
-            InProgressSentence::Count(count) => count.accept_character(ch),
-            InProgressSentence::Complete(_) => CharResult::Rejected,
-        }
-    }
-
-    fn accept_motion(&mut self, motion: Motion) -> CharResult {
-        let count = match self {
-            InProgressSentence::Start => Count::Empty,
-            InProgressSentence::Count(count) => std::mem::take(count),
-            InProgressSentence::Complete(_) => return CharResult::Rejected,
-        };
-        let count_and_motion = CountAndMotion { count, motion };
-        *self = InProgressSentence::Complete(count_and_motion);
-        CharResult::Accepted
-    }
-
-    pub fn is_complete(&self) -> bool {
-        matches!(self, InProgressSentence::Complete(_))
-    }
-
-    /// Runs a completed sentence. The caller takes the sentence out of `State`
-    /// before calling this, so there is no aliasing with `state`.
-    pub fn execute(self, state: &mut State) -> Result<()> {
-        let InProgressSentence::Complete(count_and_motion) = self else {
-            return Ok(());
-        };
-        let CountAndMotion { count, motion } = count_and_motion;
-
-        let repeat = count.repeat();
-        let mut done = 0;
-        while done < repeat {
-            motion.execute(state)?;
-            done += 1;
-        }
-        Ok(())
+    pub fn is_complete(self) -> bool {
+        false
     }
 }
 
-#[derive(Debug)]
-pub struct CountAndMotion {
-    count: Count,
-    motion: Motion,
-}
-
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 enum Motion {
-    Up,
-    Down,
+    Empty,
     Left,
     Right,
-    // Deferred (see PLAN.md): the `_` line motion. Kept as its eventual home;
-    // `from_char` does not map to it yet.
-    #[allow(dead_code)]
-    Line,
+    Up,
+    Down,
 }
 
 impl Motion {
-    fn from_char(ch: char) -> Option<Motion> {
-        let motion = match ch {
-            'h' => Motion::Left,
-            'j' => Motion::Down,
-            'k' => Motion::Up,
-            'l' => Motion::Right,
-            _ => return None,
+    fn accept_character(&mut self, ch: char) -> CharResult {
+        let motion = match (*self, ch) {
+            (Motion::Empty, 'h') => Motion::Left,
+            (Motion::Empty, 'j') => Motion::Down,
+            (Motion::Empty, 'k') => Motion::Up,
+            (Motion::Empty, 'l') => Motion::Right,
+            _ => return CharResult::Rejected(ch),
         };
-        Some(motion)
+        *self = motion;
+        CharResult::Accepted
     }
 
-    fn execute(&self, state: &mut State) -> Result<()> {
+    fn is_complete(&self) -> bool {
         match self {
-            Motion::Up => state.handle_up(),
-            Motion::Down => state.handle_down(),
-            Motion::Left => state.handle_left(),
-            Motion::Right => state.handle_right(),
-            Motion::Line => anyhow::bail!("Line motion (`_`) is not yet implemented"),
-        }
-    }
-}
-
-// Deferred to the next pass (see PLAN.md): operators (`d`, `y`, `c`) and the
-// `[count] operator [count] motion` grammar, which need range delete/yank in
-// `Data`.
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn accepted(result: CharResult) -> bool {
-        matches!(result, CharResult::Accepted)
-    }
-
-    /// Feeds each character in order, asserting every one is accepted.
-    fn feed(sentence: &mut InProgressSentence, chars: &str) {
-        for ch in chars.chars() {
-            assert!(accepted(sentence.accept_character(ch)), "rejected {:?}", ch);
-        }
-    }
-
-    fn completed(sentence: &InProgressSentence) -> (u64, &Motion) {
-        match sentence {
-            InProgressSentence::Complete(CountAndMotion { count, motion }) => {
-                (count.repeat(), motion)
-            }
-            other => panic!("expected a completed sentence, got {:?}", other),
-        }
-    }
-
-    #[test]
-    fn bare_motion_has_count_one() {
-        let mut sentence = InProgressSentence::new();
-        feed(&mut sentence, "j");
-        assert!(sentence.is_complete());
-        let (repeat, motion) = completed(&sentence);
-        assert_eq!(repeat, 1);
-        assert!(matches!(motion, Motion::Down));
-    }
-
-    #[test]
-    fn single_digit_count() {
-        let mut sentence = InProgressSentence::new();
-        feed(&mut sentence, "3j");
-        let (repeat, motion) = completed(&sentence);
-        assert_eq!(repeat, 3);
-        assert!(matches!(motion, Motion::Down));
-    }
-
-    #[test]
-    fn multi_digit_count() {
-        let mut sentence = InProgressSentence::new();
-        feed(&mut sentence, "12l");
-        let (repeat, motion) = completed(&sentence);
-        assert_eq!(repeat, 12);
-        assert!(matches!(motion, Motion::Right));
-    }
-
-    #[test]
-    fn count_is_incomplete_before_motion() {
-        let mut sentence = InProgressSentence::new();
-        feed(&mut sentence, "3");
-        assert!(!sentence.is_complete());
-    }
-
-    #[test]
-    fn non_sentence_char_is_rejected() {
-        let mut sentence = InProgressSentence::new();
-        let result = sentence.accept_character('x');
-        assert!(!accepted(result));
-        assert!(!sentence.is_complete());
-    }
-
-    #[test]
-    fn all_directions_map() {
-        let cases = [
-            ('h', Motion::Left),
-            ('j', Motion::Down),
-            ('k', Motion::Up),
-            ('l', Motion::Right),
-        ];
-        for (ch, expected) in cases {
-            let mut sentence = InProgressSentence::new();
-            feed(&mut sentence, &ch.to_string());
-            let (_, motion) = completed(&sentence);
-            assert!(
-                std::mem::discriminant(motion) == std::mem::discriminant(&expected),
-                "{:?} mapped to {:?}, expected {:?}",
-                ch,
-                motion,
-                expected
-            );
+            Motion::Empty => false,
+            _ => true,
         }
     }
 }

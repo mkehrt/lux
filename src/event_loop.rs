@@ -7,10 +7,7 @@ use lux_core::state::State;
 use crate::key_translation;
 use crate::terminal::{self, PreviousTerminalState};
 
-pub fn event_loop(
-    mut state: State,
-    previous: PreviousTerminalState,
-) -> Result<()> {
+pub fn event_loop(mut state: State, previous: PreviousTerminalState) -> Result<()> {
     loop {
         let event = terminal::read_event()?;
 

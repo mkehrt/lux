@@ -21,7 +21,12 @@ pub enum Dirty {
 }
 
 impl Data {
-    pub fn render(&self, data_start_row: usize, rendered_rows: u16, rendered_cols: u16) -> Result<String> {
+    pub fn render(
+        &self,
+        data_start_row: usize,
+        rendered_rows: u16,
+        rendered_cols: u16,
+    ) -> Result<String> {
         self.check_invariants();
 
         let rendered_rows = rendered_rows as usize;
@@ -40,7 +45,7 @@ impl Data {
             while !row_done && rendered_row < rendered_rows {
                 let chunk_end = (chunk_start + rendered_cols).min(row_data.len());
                 result.push_str(&row_data[chunk_start..chunk_end]);
-                result.push_str ("\r\n");
+                result.push_str("\r\n");
 
                 rendered_row += 1;
                 row_done = chunk_end >= row_data.len();
@@ -253,11 +258,7 @@ impl Data {
         for (row_index, row) in self.data.iter().enumerate() {
             for ch in row.chars() {
                 let is_newline = ch == '\n' || ch == '\r';
-                assert!(
-                    !is_newline,
-                    "Debug assertion: newline in row {}",
-                    row_index
-                );
+                assert!(!is_newline, "Debug assertion: newline in row {}", row_index);
             }
         }
     }
