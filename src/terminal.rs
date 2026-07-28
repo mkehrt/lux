@@ -5,12 +5,17 @@ use crossterm::execute;
 use crossterm::terminal;
 use std::io::{self, Write as _};
 
-use lux_core::terminal::Terminal;
+use lux_core::terminal::{Terminal, TerminalSize};
 
 /// Crossterm-backed implementation of the library's drawing interface.
 pub struct CrosstermTerminal;
 
 impl Terminal for CrosstermTerminal {
+    fn size(&self) -> Result<TerminalSize> {
+        let (cols, rows) = size()?;
+        Ok(TerminalSize::new(cols, rows))
+    }
+
     fn write_char(&mut self, c: char) -> Result<()> {
         write!(io::stdout(), "{}", c)?;
         Ok(())

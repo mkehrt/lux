@@ -2,32 +2,43 @@ use anyhow::Result;
 
 use crate::data;
 use crate::data::Dirty;
-use crate::insert::Insert;
+use crate::insert;
 use crate::key::{Event, KeyCode, KeyEvent, KeyModifiers};
-use crate::normal::Normal;
-use crate::terminal::Terminal;
+use crate::normal;
+use crate::sentence;
+use crate::terminal;
 
 #[derive(Debug)]
 pub enum Mode {
-    Normal(Normal),
-    Insert(Insert),
+    Normal { sentence: sentence::Sentence },
+    Insert,
 }
 
+impl Mode {
+    pub fn default_normal() -> Self {
+        let sentence = sentence::Sentence::default();
+        Self::Normal { sentence }
+    }
+}
 pub struct State {
-    pub(crate) data: data::Data,
+    pub(crate) terminal: Box<dyn terminal::Terminal>,
+    pub(crate) terminal_size: terminal::TerminalSize,
     mode: Mode,
-    pub(crate) terminal: Box<dyn Terminal>,
-    pub(crate) terminal_size: TerminalSize,
+    pub(crate) data: data::Data,
 }
 
 impl State {
-    pub fn new(terminal: Box<dyn Terminal>, terminal_size: TerminalSize, data: data::Data) -> Self {
-        Self {
+    pub fn new(terminal: Box<dyn terminal::Terminal>) -> Result<Self> {
+        let terminal_size = terminal.size()?;
+        let data = data::Data::default();
+        let mode = Mode::default_normal();
+        let state = Self {
             terminal,
             terminal_size,
             data,
-            mode: Mode::Normal(Normal::new()),
-        }
+            mode,
+        };
+        Ok(state)
     }
 
     pub fn write_status_line(&mut self, text: &str) -> Result<()> {
@@ -64,7 +75,7 @@ impl State {
                 code: KeyCode::Esc,
                 modifiers: KeyModifiers::None,
             }) => {
-                self.set_mode(Mode::Normal(Normal::new()));
+                self.set_mode(Mode::default_normal());
             }
             Event::Key(KeyEvent {
                 code: KeyCode::Char(c),
@@ -121,11 +132,10 @@ impl State {
     }
 
     /// Dispatches a character to the handler for the current mode.
-    fn handle_char(&self, ch: char) -> Result<Dirty> {
+    fn handle_char(&mut self, ch: char) -> Result<Dirty> {
         match &mut self.mode {
-            This doesn't work
-            Mode::Normal(normal) => normal.handle_char(self, ch),
-            Mode::Insert(insert) => insert.handle_char(self, ch),
+            Mode::Normal { sentence: _ } => normal::handle_char(self, ch),
+            Mode::Insert => insert::handle_char(self, ch),
         }
     }
 
@@ -166,23 +176,11 @@ impl State {
     }
 
     pub fn handle_resize(&mut self, cols: u16, rows: u16) {
-        self.terminal_size = TerminalSize { cols, rows };
+        self.terminal_size = terminal::TerminalSize { cols, rows };
     }
 
     pub fn handle_unknown_event(&mut self, event: Event) -> Result<()> {
         self.write_status_line(&format!("{:?}", event))?;
         Ok(())
-    }
-}
-
-#[derive(Debug)]
-pub struct TerminalSize {
-    rows: u16,
-    pub(crate) cols: u16,
-}
-
-impl TerminalSize {
-    pub fn new(cols: u16, rows: u16) -> Self {
-        Self { cols, rows }
     }
 }

@@ -3,15 +3,7 @@ use anyhow::Result;
 use crate::data::Dirty;
 use crate::state::State;
 
-#[derive(Debug)]
-pub struct Insert {}
-
-impl Insert {
-    pub fn new() -> Self {
-        Self {}
-    }
-
-pub fn handle_char(&mut self, state: &mut State, c: char) -> Result<Dirty> {
+pub fn handle_char(state: &mut State, c: char) -> Result<Dirty> {
     state.terminal.write_char(c)?;
     let mut dirty = state.data.insert_char(c)?;
 
@@ -23,5 +15,4 @@ pub fn handle_char(&mut self, state: &mut State, c: char) -> Result<Dirty> {
 
     state.update_cursor()?;
     Ok(dirty)
-}
 }

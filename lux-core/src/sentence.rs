@@ -8,7 +8,7 @@ pub enum CharResult {
 }
 
 #[derive(Copy, Clone, Debug)]
-pub enum InProgressSentence {
+pub enum Sentence {
     ParsingCountForOperator {
         operator_count: Count,
     },
@@ -29,11 +29,17 @@ pub enum InProgressSentence {
     },
 }
 
-impl InProgressSentence {
-    pub fn new() -> Self {
-        InProgressSentence::ParsingCountForOperator {
+impl Default for Sentence {
+    fn default() -> Self {
+        Sentence::ParsingCountForOperator {
             operator_count: Count::Empty,
         }
+    }
+}
+
+impl Sentence {
+    pub fn reset(&mut self) {
+        *self = Self::default();
     }
 
     /// A complete sentence is one which either ends in a
@@ -51,16 +57,16 @@ impl InProgressSentence {
     /// which could be completed by, for example, 'w'.
     pub fn is_complete(&self) -> bool {
         match self {
-            InProgressSentence::ParsingCountForOperator { .. } => false,
-            InProgressSentence::ParsingOperator { operator, .. } => operator.is_complete(),
-            InProgressSentence::ParsingCountForMotion { .. } => false,
-            InProgressSentence::ParsingMotion { motion, .. } => motion.is_complete(),
+            Sentence::ParsingCountForOperator { .. } => false,
+            Sentence::ParsingOperator { operator, .. } => operator.is_complete(),
+            Sentence::ParsingCountForMotion { .. } => false,
+            Sentence::ParsingMotion { motion, .. } => motion.is_complete(),
         }
     }
 
     pub fn accept_character(&mut self, ch: char) -> CharResult {
         use CharResult::*;
-        use InProgressSentence::*;
+        use Sentence::*;
         match *self {
             ParsingCountForOperator { mut operator_count } => {
                 if let Rejected(ch) = operator_count.accept_character(ch) {
