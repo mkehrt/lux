@@ -20,8 +20,8 @@ pub fn handle_char(state: &mut State, c: char) -> Result<Dirty> {
         CharResult::Accepted => {
             let mut dirty = Dirty::Clean;
             if sentence.is_complete() {
-                dirty = sentence.execute(state)?;
-                sentence.reset();
+                let old_sentence = std::mem::take(sentence);
+                dirty = old_sentence.execute(state)?;
             }
             Ok(dirty)
         }
