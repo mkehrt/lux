@@ -1,5 +1,5 @@
 use anyhow::Result;
-use crossterm::event::{Event, KeyCode, KeyEventKind, KeyModifiers};
+use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 
 use lux_core::data::Dirty;
 use lux_core::state::State;
@@ -29,11 +29,13 @@ pub fn event_loop(mut state: State, previous: PreviousTerminalState) -> Result<(
 }
 
 fn is_ctrl_c(event: &Event) -> bool {
-    let Event::Key(key_event) = event else {
-        return false;
-    };
-    let is_char_c = key_event.code == KeyCode::Char('c');
-    let is_control = key_event.modifiers == KeyModifiers::CONTROL;
-    let is_press = key_event.kind == KeyEventKind::Press;
-    is_char_c && is_control && is_press
+    match event {
+        Event::Key(KeyEvent {
+            code: KeyCode::Char('c'),
+            modifiers: KeyModifiers::CONTROL,
+            kind: KeyEventKind::Press,
+            ..
+        }) => true,
+        _ => false,
+    }
 }
